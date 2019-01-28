@@ -1,0 +1,82 @@
+Tomcat server
+-------------
+
+1. Setup a ssh user for web deployment
+
+useradd webdeploy -d /webapp -s /bin/bash
+passwd webdeploy
+chown -R webdeploy:webdeploy /webapp/
+
+>> vi /etc/sudoers
+webdeploy ALL=(ALL:ALL) NOPASSWD:ALL
+
+
+2. Enable manager UI user in tomcat
+
+vi /var/lib/tomcat7/conf/tomcat-users.xml
+
+
+<tomcat-users>
+      <role rolename="manager-gui"/>
+      <user username="admin" password="password" roles="manager-gui,admin-gui,manager-script"/>
+</tomcat-users> 
+
+sudo service tomcat7 restart
+  
+
+Chef-workstation
+
+1. Bootstrap tomcat machine using chef
+
+knife bootstrap 192.168.33.15 -N webappserver -x vagrant -P vagrant --sudo
+
+
+
+
+2. Create a cookbook and add following recipe
+
+# Cookbook:: webappdeploy
+# Recipe:: default
+#
+# Copyright:: 2017, The Authors, All Rights Reserved.
+
+ execute 'StopOldWar' do
+        command 'wget --http-user=admin --http-password=password "http://localhost:8080/manager/text/stop?path=/testwebapp" -O -'
+        action :run
+   end
+
+   execute 'UnDeployOldWar' do
+       command 'wget --http-user=admin --http-password=password "http://localhost:8080/manager/text/undeploy?path=/testwebapp" -O -'
+       action :run
+   end
+
+   execute 'DeployNewWar' do
+       command 'wget --http-user=admin --http-password=password "http://localhost:8080/manager/text/deploy?war=file:/webapp/testwebapp.war&path=/testwebapp" -O -'
+       action :run
+   end
+
+
+
+
+>> Jenkins server
+
+ssh-copy-id webdeploy@192.168.33.15
+
+
+
+Create jobs
+
+Build
+
+execute shell
+
+
+ssh webdeploy@192.168.33.15 'rm -rf /webapp/testwebapp.war';\
+scp /var/lib/jenkins/workspace/helloworldsample/target/*.war webdeploy@192.168.33.15:/webapp/testwebapp.war; \
+ssh webdeploy@192.168.33.15 'sudo chef-client';
+
+
+
+
+
+
